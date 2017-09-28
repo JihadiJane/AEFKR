@@ -5,7 +5,7 @@ var numLayers = selectedLayers.length;
 var glitchFreq = 0; 
 var glitchAmp = 0;
 var frameBias = 2;
-var tempTime;
+var tempTime = 0;
 
 
 // time fucker
