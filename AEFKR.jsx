@@ -1,56 +1,178 @@
+
+
+
+
+
 var mainComp = app.project.activeItem;
-<<<<<<< HEAD
 var selectedLayers =mainComp.selectedLayers; 
-=======
-var selectedLayers = mainComp.selectedLayers;
->>>>>>> 7bca88844a9ccfdcb4c767d210a4e28a83b995f6
 var numLayers = selectedLayers.length;
 
-var glitchFreq = 0; 
-var glitchAmp = 0;
-var frameBias = 2;
-var tempTime = 0;
-
-
-// time fucker
-for (var i = 0; i < numLayers; i++)
+var frameBias = 			           0  ,																			// 								which frames to move on
+	frameRange = 			      [ 0, 0 ],																			// [ startFrame, endFrame ]		sets frame range			
+	centerPoint = 			  [ 500, 500 ],																			// [ X, Y ]						center of glitch (assume nullPos is centerPoint, take incoming pos at time)
+	masks =						  [ 10, 0 ],																			// [ maskAmount, variance ]  	how many masks, and general scale variance on freq min/max scale
+	freq = 			 		   [ 0, 0, 0 ],																			// [ min, max, bias ] 			range for glitch jitter with bias (set at beginning per mask, keep consistent throughout execution)
+	amp = 	   	  [ 100, -100, 100, -100 ]																			// [ X+, X-, Y+, Y- ] 			amplitude in each direction XY
+	;
+	
+for (var i = 0; i < numLayers; i++)																					// per layer selected
 {
-<<<<<<< HEAD
 
-	var currentLayer, verts, tempMask, newMask;
+	var currentLayer = selectedLayers[i],																			// current layer of selected layers
+		newMasks																									// array of new masks following maskAmount	
+		boundsShape = new Shape()
+		boundsMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
+		boundsRange = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ]
+		;
 
-	verts = [[0,0],[0,100],[100,100],[100,0]];
+	currentLayer.property("Position").setValue([ 0,0 ]); 															// reposition layer to 0,0
 
-	currentLayer = selectedLayers[i];
+	boundsRange[0][0] = centerPoint[0] + amp[1]; 																	// set bounds range for testing
+	boundsRange[0][1] = centerPoint[1] + amp[2];
 
-	newShape = new Shape();
-	newShape.vertices = verts;
+	boundsRange[1][0] = centerPoint[0] + amp[0]; 
+	boundsRange[1][1] = centerPoint[1] + amp[2];
 
-	newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask");
-	newMask.property("ADBE Mask Shape").setValue(newShape);
-	newMask.name = "newMask_001";
+	boundsRange[2][0] = centerPoint[0] + amp[0]; 
+	boundsRange[2][1] = centerPoint[1] + amp[3];
 
-	prop1.setValueAtTime(seconds, value);
-	// tempMask = currentLayer.property("ADBE Mask Parade").property(1);
-	// tempMask.property("ADBE Mask Shape").setValue(verts);
+	boundsRange[3][0] = centerPoint[0] + amp[1]; 
+	boundsRange[3][1] = centerPoint[1] + amp[3];
 
-=======
->>>>>>> 7bca88844a9ccfdcb4c767d210a4e28a83b995f6
-	// get time length of each layer
-	// while tempTime < time length do this, else: tempTime = 0, 
-	// // tempTime += rand(frameBias, frameBias + rand(0, frameBias * (1 + amp)) % 2
-	// // place keyframe at tempTime
+	boundsShape.vertices = boundsRange;
+	boundsMask.property("ADBE Mask Shape").setValue(boundsShape);
+	boundsMask.color = [ 1, 0, 0 ];
+	boundsMask.name = "_glitchBOUNDS";
 
-	// repeat while loop for moving keyframes and converting some to holds
-	// convert to hold, then probability choose if moved (low probability for moving keys)
 
-<<<<<<< HEAD
-	glitchAmp = i;
+	for (var i = 0; i < masks[0]; i++)																				// loop through each mask
+	{
+		var verts = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ], 													// array of [ X+, X-, Y+, Y- ] vertices per newMasks
+			newVert,																								// newVert to be changed per loop	
+			point0 = [ 0, 0 ],  																					// random point0 within range of amp
+			point1 = [ 0, 0 ]																						// random point1 within range of amp
+			;		
+
+		point0[0] = Math.random() * ((centerPoint[0] + amp[0]) - (centerPoint[0] + amp[1])) + (centerPoint[0] + amp[1]);
+		point0[1] = Math.random() * ((centerPoint[1] + amp[2]) - (centerPoint[1] + amp[3])) + (centerPoint[1] + amp[3]);
+
+		point1[0] = Math.random() * ((centerPoint[0] + amp[0]) - (centerPoint[0] + amp[1])) + (centerPoint[0] + amp[1]);
+		point1[1] = Math.random() * ((centerPoint[1] + amp[2]) - (centerPoint[1] + amp[3])) + (centerPoint[1] + amp[3]);
+
+		
+
+		// vert 0
+		verts[0][0] = point0[0];	// per vert, 
+		verts[0][1] = point0[1];
+
+		// vert 1
+		verts[1][0] = point1[0];
+		verts[1][1] = point0[1];
+
+		// vert 2
+		verts[2][0] = point1[0];
+		verts[2][1] = point1[1];
+
+		// vert 3
+		verts[3][0] = point0[0];
+		verts[3][1] = point1[1];
+
+		var maskName =  "mask" + i.toString();
+			newShape = new Shape(),
+			newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
+			;		
+			
+
+
+ 		newShape.vertices = verts;
+
+		newMask.property("ADBE Mask Shape").setValue(newShape);
+		newMask.name = "_" + maskName;
+
+	}
 }
 
-alert(selectedLayers);
 
-=======
-}
 
->>>>>>> 7bca88844a9ccfdcb4c767d210a4e28a83b995f6
+// in the for loop
+	// make new masks out of masksAmount, put in newMasks
+	
+	// for each in newMasks {																						// create the initial masks
+		// var tempVerts per mask
+		// verts.pop(tempVerts) add it to the array of vert arrays (newMask[0].vertices = verts[0])
+	
+	// 
+
+
+
+
+
+
+
+
+
+
+
+/*
+
+//////////////////////////////////////////////
+
+centerPoint[ X, Y ]							// center of glitch (assume nullPos is centerPoint, take incoming pos at time)
+amp[ X+, X-, Y+, Y- ]					    // amplitude in each direction XY
+frameBias									// which frames to move on
+freqRange[ min, max, bias ]					// range for glitch jitter with bias (set at beginning per mask, keep consistent throughout execution [stable masks stay, jittery move])
+
+
+*/
+
+
+
+
+
+
+
+
+// var glitchFreq = 0; 
+// var glitchAmp = 0;
+// var frameBias = 2;
+// var tempTime = 0;
+// var centerPoint,
+
+// // time fucker
+// for (var i = 0; i < numLayers; i++)
+// {
+
+// 	var currentLayer, 
+// 		verts, 
+// 		tempMask, 
+// 		newMask
+// 		;
+
+// 	verts = [[0,0],[0,100],[100,100],[100,0]];
+
+// 	currentLayer = selectedLayers[i];
+
+// 	newShape = new Shape();
+// 	newShape.vertices = verts;
+
+// 	newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask");
+// 	newMask.property("ADBE Mask Shape").setValue(newShape);
+// 	newMask.name = "newMask_001";
+
+// 	prop1.setValueAtTime(seconds, value);
+// 	// tempMask = currentLayer.property("ADBE Mask Parade").property(1);
+// 	// tempMask.property("ADBE Mask Shape").setValue(verts);
+
+// 	// get time length of each layer
+// 	// while tempTime < time length do this, else: tempTime = 0, 
+// 	// // tempTime += rand(frameBias, frameBias + rand(0, frameBias * (1 + amp)) % 2
+// 	// // place keyframe at tempTime
+
+// 	// repeat while loop for moving keyframes and converting some to holds
+// 	// convert to hold, then probability choose if moved (low probability for moving keys)
+
+// 	glitchAmp = i;
+// }
+
+// alert(selectedLayers);
+
