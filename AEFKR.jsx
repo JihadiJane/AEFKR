@@ -1,5 +1,9 @@
 var mainComp = app.project.activeItem;
+<<<<<<< HEAD
 var selectedLayers =mainComp.selectedLayers; 
+=======
+var selectedLayers = mainComp.selectedLayers;
+>>>>>>> 7bca88844a9ccfdcb4c767d210a4e28a83b995f6
 var numLayers = selectedLayers.length;
 
 var glitchFreq = 0; 
@@ -11,6 +15,7 @@ var tempTime = 0;
 // time fucker
 for (var i = 0; i < numLayers; i++)
 {
+<<<<<<< HEAD
 
 	var currentLayer, verts, tempMask, newMask;
 
@@ -29,6 +34,8 @@ for (var i = 0; i < numLayers; i++)
 	// tempMask = currentLayer.property("ADBE Mask Parade").property(1);
 	// tempMask.property("ADBE Mask Shape").setValue(verts);
 
+=======
+>>>>>>> 7bca88844a9ccfdcb4c767d210a4e28a83b995f6
 	// get time length of each layer
 	// while tempTime < time length do this, else: tempTime = 0, 
 	// // tempTime += rand(frameBias, frameBias + rand(0, frameBias * (1 + amp)) % 2
@@ -37,8 +44,13 @@ for (var i = 0; i < numLayers; i++)
 	// repeat while loop for moving keyframes and converting some to holds
 	// convert to hold, then probability choose if moved (low probability for moving keys)
 
+<<<<<<< HEAD
 	glitchAmp = i;
 }
 
 alert(selectedLayers);
 
+=======
+}
+
+>>>>>>> 7bca88844a9ccfdcb4c767d210a4e28a83b995f6
