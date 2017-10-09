@@ -10,9 +10,10 @@ var numLayers = selectedLayers.length;
 var frameBias = 			           0  ,																			// 								which frames to move on
 	frameRange = 			      [ 0, 0 ],																			// [ startFrame, endFrame ]		sets frame range			
 	centerPoint = 			  [ 500, 500 ],																			// [ X, Y ]						center of glitch (assume nullPos is centerPoint, take incoming pos at time)
-	masks =						  [ 10, 0 ],																			// [ maskAmount, variance ]  	how many masks, and general scale variance on freq min/max scale
+	masks =						  [ 10, 0 ],																		// [ maskAmount, variance ]  	how many masks, and general scale variance on freq min/max scale
 	freq = 			 		   [ 0, 0, 0 ],																			// [ min, max, bias ] 			range for glitch jitter with bias (set at beginning per mask, keep consistent throughout execution)
-	amp = 	   	  [ 100, -100, 100, -100 ]																			// [ X+, X-, Y+, Y- ] 			amplitude in each direction XY
+	amp = 	   	  [ 100, -100, 100, -100 ],																			// [ X+, X-, Y+, Y- ] 			amplitude in each direction XY
+	createdMasks = []
 	;
 	
 for (var i = 0; i < numLayers; i++)																					// per layer selected
@@ -47,11 +48,91 @@ for (var i = 0; i < numLayers; i++)																					// per layer selected
 
 	for (var i = 0; i < masks[0]; i++)																				// loop through each mask
 	{
-		var verts = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ], 													// array of [ X+, X-, Y+, Y- ] vertices per newMasks
-			newVert,																								// newVert to be changed per loop	
-			point0 = [ 0, 0 ],  																					// random point0 within range of amp
-			point1 = [ 0, 0 ]																						// random point1 within range of amp
+
+		var maskVerts = randomVertsInRange();
+
+		var maskName =  "mask" + i.toString();
+			newShape = new Shape(),
+			newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
 			;		
+			
+ 		newShape.vertices = maskVerts;
+
+		newMask.property("ADBE Mask Shape").setValue(newShape);
+		newMask.name = "_" + maskName;
+
+		createdMasks.push(newShape);
+
+	}
+
+	for (var i = 0; i < createdMasks.length; i++)
+	{
+		var randVerts,
+			randShape = new Shape(),
+			randMask,
+			paths,
+			pathNames,
+			masksGrp,
+			masksGrpLen,
+			currKey
+			;
+
+		paths = [];
+		pathNames = [];
+
+		masksGrp = selectedLayers[0].property("ADBE Mask Parade");
+		masksGrpLen = masksGrp.numProperties;
+
+		if (masksGrpLen > 0)
+		{
+			for(var f = 2; f <= masksGrpLen; f++)
+			{
+				currKey = 0;
+
+				for(var i = 0; i < 10; i++)
+				{
+				randVerts = randomVertsInRange();
+				randShape.vertices = randVerts;
+
+				currKey++;
+				
+				masksGrp.property(f).property("ADBE Mask Shape").setValueAtTime(i, randShape);
+				masksGrp.property(f).property("ADBE Mask Shape").setInterpolationTypeAtKey(currKey, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
+
+				}
+			}
+		}
+	}
+
+	// loop through all the createdMasks
+		// set value at time for each mask
+		// 
+
+
+
+	var maskLen = createdMasks.length;
+}
+
+function setMaskVertsAtTime(time, keyVerts)
+{
+	var tempShape = new Shape();
+		
+		tempShape.vertices = keyVerts;	
+
+		masksGrp = selectedLayers[0].property("ADBE Mask Parade");
+		masksGrpLen = masksGrp.numProperties;
+		masksGrp.property(f).property("ADBE Mask Shape").setValueAtTime(time, tempShape);
+}
+
+
+
+function randomVertsInRange() 
+{
+		var verts = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ], 													// array of [ X+, X-, Y+, Y- ] vertices per newMasks
+		newVert,																								// newVert to be changed per loop	
+		point0 = [ 0, 0 ],  																					// random point0 within range of amp
+		point1 = [ 0, 0 ]																						// random point1 within range of amp
+		;		
 
 		point0[0] = Math.random() * ((centerPoint[0] + amp[0]) - (centerPoint[0] + amp[1])) + (centerPoint[0] + amp[1]);
 		point0[1] = Math.random() * ((centerPoint[1] + amp[2]) - (centerPoint[1] + amp[3])) + (centerPoint[1] + amp[3]);
@@ -59,10 +140,8 @@ for (var i = 0; i < numLayers; i++)																					// per layer selected
 		point1[0] = Math.random() * ((centerPoint[0] + amp[0]) - (centerPoint[0] + amp[1])) + (centerPoint[0] + amp[1]);
 		point1[1] = Math.random() * ((centerPoint[1] + amp[2]) - (centerPoint[1] + amp[3])) + (centerPoint[1] + amp[3]);
 
-		
-
 		// vert 0
-		verts[0][0] = point0[0];	// per vert, 
+		verts[0][0] = point0[0];	// per vert
 		verts[0][1] = point0[1];
 
 		// vert 1
@@ -77,20 +156,28 @@ for (var i = 0; i < numLayers; i++)																					// per layer selected
 		verts[3][0] = point0[0];
 		verts[3][1] = point1[1];
 
-		var maskName =  "mask" + i.toString();
-			newShape = new Shape(),
-			newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
-			;		
-			
-
-
- 		newShape.vertices = verts;
-
-		newMask.property("ADBE Mask Shape").setValue(newShape);
-		newMask.name = "_" + maskName;
-
-	}
+		return verts;
 }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
