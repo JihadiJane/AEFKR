@@ -8,7 +8,7 @@ var selectedLayers =mainComp.selectedLayers;
 var numLayers = selectedLayers.length;
 
 var frameBias = 			           4  ,																			// 								which frames to move on
-	frameRange = 			      [ 0, 50 ],	
+	frameRange = 			      [ 10, 50 ],	
 	frameRate = 						24,																		// [ startFrame, endFrame ]		sets frame range			
 	centerPoint = 			  [ 500, 500 ],																			// [ X, Y ]						center of glitch (assume nullPos is centerPoint, take incoming pos at time)
 	masks =						  [ 10, 0 ],																		// [ maskAmount, variance ]  	how many masks, and general scale variance on freq min/max scale
@@ -47,8 +47,10 @@ for (var i = 0; i < numLayers; i++)																					// per layer selected
 	boundsMask.name = "_glitchBOUNDS";
 	boundsMask.maskMode = MaskMode.NONE;
 
+	createdMasks.push(boundsShape);
 
-	for (var i = 0; i < masks[0]; i++)																				// loop through each mask
+
+	for (var i = 0; i < masks[0]; i++)																				// make each of the masks with random verts
 	{
 
 		var maskVerts = randomVertsInRange();
@@ -63,74 +65,71 @@ for (var i = 0; i < numLayers; i++)																					// per layer selected
 		newMask.property("ADBE Mask Shape").setValue(newShape);
 		newMask.name = "_" + maskName;
 
-		createdMasks.push(newShape);
+		createdMasks.push(newShape);																				// put all masks in createdMasks array
 
 	}
 
-	for (var i = 0; i < createdMasks.length; i++)																	// loop again through existing masks
+	for (var i = 2; i < createdMasks.length + 1; i++)																	// loop through existing masks
 	{
 		var randVerts,
 			randShape = new Shape(),
 			masksGrp,
 			masksGrpLen,
-			currKey
+			currentTime = startTime,
+			f = frameRange[0]
 			;
-
-		paths = [];
-		pathNames = [];
 
 		masksGrp = selectedLayers[0].property("ADBE Mask Parade");
 		masksGrpLen = masksGrp.numProperties;
 
-		if (masksGrpLen > 0)
+		setMaskVertsAtTime(currentTime, i, randomVertsInRange());
+
+		while (f <= frameRange[1])															// loop through each frame in the range
 		{
-			var currentTime,
-				startTime = convertFPSToTime(frameRange[0], 24),
-				endTime =  convertFPSToTime(frameRange[1], 24),
-				i = 0
-				;
+			currentTime = convertFPSToTime(f, 24);
 
-			currentTime = startTime;
-
-			// for(var f = startTime; f <= endTime; f + frameBias)				// go through each frame in the range
-			// {
-			// 	currentTime = convertFPSToTime(f, 24);
-
-			// 	for(var f = 1; f <= masksGrpLen; f++)
-			// 	{
-			// 		setMaskVertsAtTime(currentTime, f, randomVertsInRange());
-			// 	}
-
-			// 	i++;
-			// }
-
-			//alert(i);
+			setMaskVertsAtTime(currentTime, i, randomVertsInRange());
+			f += frameBias;
 		}
-
-		// if (masksGrpLen > 0)
-		// {
-		// 	for(var f = 2; f <= masksGrpLen; f++)
-		// 	{
-		// 		currKey = 0;
-
-		// 		for(var i = 0; i < 10; i++)
-		// 		{
-		// 		randVerts = randomVertsInRange();
-		// 		randShape.vertices = randVerts;
-
-		// 		currKey++;
-				
-		// 		masksGrp.property(f).property("ADBE Mask Shape").setValueAtTime(i, randShape);
-		// 		masksGrp.property(f).property("ADBE Mask Shape").setInterpolationTypeAtKey(currKey, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
-
-		// 		}
-		// 	}
-		// }
 	}
-
-
-	var maskLen = createdMasks.length;
 }
+	// 		currentTime = startTime;
+
+	// 		// for(var f = startTime; f <= endTime; f + frameBias)				// go through each frame in the range
+	// 		// {
+	// 		// 	currentTime = convertFPSToTime(f, 24);
+
+	// 		// 	for(var f = 1; f <= masksGrpLen; f++)
+	// 		// 	{
+	// 		// 		setMaskVertsAtTime(currentTime, f, randomVertsInRange());
+	// 		// 	}
+
+	// 		// 	i++;
+	// 		// }
+
+	// 		//alert(i);
+	// 	}
+
+	// 	// if (masksGrpLen > 0)
+	// 	// {
+	// 	// 	for(var f = 2; f <= masksGrpLen; f++)
+	// 	// 	{
+	// 	// 		currKey = 0;
+
+	// 	// 		for(var i = 0; i < 10; i++)
+	// 	// 		{
+	// 	// 		randVerts = randomVertsInRange();
+	// 	// 		randShape.vertices = randVerts;
+
+	// 	// 		currKey++;
+				
+	// 	// 		masksGrp.property(f).property("ADBE Mask Shape").setValueAtTime(i, randShape);
+	// 	// 		masksGrp.property(f).property("ADBE Mask Shape").setInterpolationTypeAtKey(currKey, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
+
+	// 	// 		}
+	// 	// 	}
+	// 	// }
+
 
 function convertTimeToFPS(time, targetFPS)
 {
@@ -145,7 +144,7 @@ function convertFPSToTime(frame, targetFPS)
 {
 	var convertedFPS;
 
-	convertedFPS = Math.floor(frame / targetFPS);
+	convertedFPS = frame / targetFPS;
 	return convertedFPS;
 }
 
