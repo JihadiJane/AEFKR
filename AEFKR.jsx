@@ -1,155 +1,210 @@
 
-
-
-
-
-var mainComp = app.project.activeItem;
-var selectedLayers =mainComp.selectedLayers; 
-var numLayers = selectedLayers.length;
-
-var frameBias = 			           4  ,																			// 								which frames to move on
-	frameRange = 			      [ 0, 133 ],	
-	frameRate = 						24,																		// [ startFrame, endFrame ]		sets frame range			
-	centerPoint = 			  [ 500, 500 ],																			// [ X, Y ]						center of glitch (assume nullPos is centerPoint, take incoming pos at time)
-	masks =						  [ 5, 0 ],																		// [ maskAmount, variance ]  	how many masks, and general scale variance on freq min/max scale
-	freq = 			 		   [ 0, 0, 0 ],																			// [ min, max, bias ] 			range for glitch jitter with bias (set at beginning per mask, keep consistent throughout execution)
-	amp = 	   	  [ 100, -100, 100, -100 ],																			// [ X+, X-, Y+, Y- ] 			amplitude in each direction XY
-	createdMasks = []
+var mainComp = app.project.activeItem,
+	selectedLayers = mainComp.selectedLayers, 
+	numLayers = selectedLayers.length,
+	inputStartFrame,																		// inputs
+	inputEndFrame,
+	inputFrameRate,
+	inputFrameBias,
+	inputNumMasks,
+	inputFreqMin,
+	inputFreqMax,
+	inputFreqBias,
+	inputAmpXPos,
+	inputAmpXNeg,
+	inputAmpYPos,
+	inputAmpYNeg
 	;
-	
-for (var i = 0; i < numLayers; i++)																					// per layer selected
+
+
+// setup UI
+
+var windowAEFKR = new Window ("dialog", "AEFKR"); 											// create window
+
+var groupInput = windowAEFKR.add ("group");													// create input groups
+groupInput.orientation = "column";
+groupInput.alignChildren = "left";
+
+var groupFrameRange = groupInput.add ("group");												// frame range
+groupFrameRange.add ("statictext", undefined, "Frame range:");									
+inputStartFrame = groupFrameRange.add ("edittext", undefined, "in");
+inputEndFrame = groupFrameRange.add ("edittext", undefined, "out");
+inputStartFrame.characters = 2;
+inputEndFrame.characters = 2;
+inputStartFrame.active = true;
+
+var groupFrameRate = groupInput.add ("group");												// frame rate
+groupFrameRate.add ("statictext", undefined, "Frame rate:");									
+inputFrameRate = groupFrameRate.add ("edittext", undefined, "fps");
+inputFrameRate.characters = 2;
+
+var groupFrameBias = groupInput.add ("group");												// frame rate
+groupFrameBias.add ("statictext", undefined, "Frame bias:");									
+inputFrameBias = groupFrameBias.add ("edittext", undefined, "frames");
+inputFrameBias.characters = 4;
+
+var groupNumMasks = groupInput.add ("group");												// num masks
+groupNumMasks.add ("statictext", undefined, "Number of masks:");									
+inputNumMasks = groupNumMasks.add ("edittext", undefined, "?");
+inputNumMasks.characters = 2;
+
+var groupFreq = groupInput.add ("group");													// frequency
+groupFreq.add ("statictext", undefined, "Frequency:");									
+inputFreqMin = groupFreq.add ("edittext", undefined, "min");
+inputFreqMax = groupFreq.add ("edittext", undefined, "max");
+inputFreqBias = groupFreq.add ("edittext", undefined, "bias");
+inputFreqMin.characters = 2;
+inputFreqMax.characters = 3;
+inputFreqBias.characters = 3;
+
+var groupAmp = groupInput.add ("group");													// amp
+groupAmp.add ("statictext", undefined, "Amplitude:");									
+inputAmpXPos = groupAmp.add ("edittext", undefined, "X+");
+inputAmpXNeg = groupAmp.add ("edittext", undefined, "X-");
+inputAmpYPos = groupAmp.add ("edittext", undefined, "Y+");
+var inputAmpYNeg = groupAmp.add ("edittext", undefined, "Y-");
+inputAmpXPos.characters = 2;
+inputAmpXNeg.characters = 2;
+inputAmpYPos.characters = 2;
+inputAmpYNeg.characters = 2;
+
+var layersList = [];
+for (i = 0; i < mainComp.layers.length; i++)
 {
+	layersList.push(mainComp.layers[i + 1].name);
+}
 
-	var currentLayer = selectedLayers[i],																			// current layer of selected layers
-		newMasks																									// array of new masks following maskAmount	
-		boundsShape = new Shape()
-		boundsMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
-		boundsRange = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ]
+var groupLayerToActOn = groupInput.add ("group");	
+groupLayerToActOn.add ('statictext', undefined, 'Layer to glitch: ');
+var dropDownAction = groupLayerToActOn.add ('dropdownlist', undefined, layersList);
+dropDownAction.selection = 0;
+
+var groupLayerToTrack = groupInput.add ("group");	
+groupLayerToTrack.add ('statictext', undefined, 'Layer to track: ');
+var dropDownTrack = groupLayerToTrack.add ('dropdownlist', undefined, layersList);
+dropDownTrack.selection = 0;
+
+
+var groupButtons = windowAEFKR.add ("group");
+groupButtons.alignment = "right";
+var buttonOK = groupButtons.add ("button", undefined, "OK");
+var buttonCancel = groupButtons.add ("button", undefined, "Cancel");
+windowAEFKR.show();
+
+
+
+buttonOK.onClick = execute(groupInput);
+
+
+function execute(_groupInput)
+{
+	var frameBias =							 inputFrameBias,																			// 								which frames to move on
+		frameRange =				[ inputStartFrame, inputEndFrame ],	
+		frameRate = 						inputFrameRate,																		// [ startFrame, endFrame ]		sets frame range			
+		centerPoint = 			  [ 500, 500 ],																			// [ X, Y ]						center of glitch (assume nullPos is centerPoint, take incoming pos at time)
+		numMasks =						  	 inputNumMasks,																		// [ maskAmount, variance ]  	how many masks, and general scale variance on freq min/max scale
+		freq = 			 		   [ inputFreqMin, inputFreqMax, inputFreqBias ],																			// [ min, max, bias ] 			range for glitch jitter with bias (set at beginning per mask, keep consistent throughout execution)
+		amp =		  [ inputAmpXPos, inputAmpXNeg, inputAmpYPos, inputAmpYNeg ],																			// [ X+, X-, Y+, Y- ] 			amplitude in each direction XY
+		createdMasks = []
 		;
-
-	currentLayer.property("Position").setValue([ 0,0 ]); 															// reposition layer to 0,0
-
-	setBoundsRange();
-
-	boundsShape.vertices = boundsRange;
-	boundsMask.property("ADBE Mask Shape").setValue(boundsShape);
-	boundsMask.color = [ 1, 0, 0 ];
-	boundsMask.name = "_glitchBOUNDS";
-	boundsMask.maskMode = MaskMode.NONE;
-
-	createdMasks.push(boundsShape);
-
-
-	for (var i = 0; i < masks[0]; i++)																				// make each of the masks with random verts
+		
+	for (var i = 0; i < numLayers; i++)																					// per layer selected
 	{
 
-		var maskVerts = randomVertsInRange();
-
-		var maskName =  "mask" + i.toString();
-			newShape = new Shape(),
-			newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
-			;		
-			
- 		newShape.vertices = maskVerts;
-
-		newMask.property("ADBE Mask Shape").setValue(newShape);
-		newMask.name = "_" + maskName;
-
-		createdMasks.push(newShape);																				// put all masks in createdMasks array
-
-	}
-
-	for (var i = 1; i < createdMasks.length + 1; i++)																	// loop through existing masks
-	{
-		var randVerts,
-			randShape = new Shape(),
-			masksGrp,
-			masksGrpLen,
-			currentTime = convertFPSToTime(frameRange[0], 24),
-			f = frameRange[0],
-			kf = 1
+		var currentLayer = selectedLayers[i],																			// current layer of selected layers
+			newMasks																									// array of new masks following maskAmount	
+			boundsShape = new Shape()
+			boundsMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
+			boundsRange = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ]
 			;
 
-		masksGrp = selectedLayers[0].property("ADBE Mask Parade");
-		masksGrpLen = masksGrp.numProperties;
+		currentLayer.property("Position").setValue([ 0,0 ]); 															// reposition layer to 0,0
 
-		setMaskVertsAtTime(currentTime, i, randomVertsInRange());
+		setBoundsRange(centerPoint, amp);
 
-		while (f <= frameRange[1])															// loop through each frame in the range
+		boundsShape.vertices = boundsRange;
+		boundsMask.property("ADBE Mask Shape").setValue(boundsShape);
+		boundsMask.color = [ 1, 0, 0 ];
+		boundsMask.name = "_glitchBOUNDS";
+		boundsMask.maskMode = MaskMode.NONE;
+
+		createdMasks.push(boundsShape);
+
+
+		for (var i = 0; i < numMasks; i++)																				// make each of the masks with random verts
 		{
-			currentTime = convertFPSToTime(f, 24);
-			centerPoint = app.project.item(1).layer("Null 2").property("Transform").property("Position").valueAtTime(currentTime, true);
 
-			if (i > 1) 
+			var maskVerts = randomVertsInRange(centerPoint, amp);
+
+			var maskName =  "mask" + i.toString();
+				newShape = new Shape(),
+				newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask")
+				;		
+				
+	 		newShape.vertices = maskVerts;
+
+			newMask.property("ADBE Mask Shape").setValue(newShape);
+			newMask.name = "_" + maskName;
+
+			createdMasks.push(newShape);																				// put all masks in createdMasks array
+
+		}
+
+		for (var i = 1; i < createdMasks.length + 1; i++)																	// loop through existing masks
+		{
+			var randVerts,
+				randShape = new Shape(),
+				masksGrp,
+				masksGrpLen,
+				currentTime = convertFPSToTime(frameRange[0], 24),
+				f = frameRange[0],
+				kf = 1
+				;
+
+			masksGrp = selectedLayers[0].property("ADBE Mask Parade");
+			masksGrpLen = masksGrp.numProperties;
+
+			setMaskVertsAtTime(currentTime, i, randomVertsInRange(centerPoint, amp), masksGrp);
+
+			while (f <= frameRange[1])															// loop through each frame in the range
 			{
-				setMaskVertsAtTime(currentTime, i, randomVertsInRange());
-				masksGrp.property(i).property("ADBE Mask Shape").setInterpolationTypeAtKey(kf, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
+				currentTime = convertFPSToTime(f, 24);
+				centerPoint = app.project.item(1).layer("Null 2").property("Transform").property("Position").valueAtTime(currentTime, true);
+
+				if (i > 1) 
+				{
+					setMaskVertsAtTime(currentTime, i, randomVertsInRange(centerPoint, amp), masksGrp);
+					masksGrp.property(i).property("ADBE Mask Shape").setInterpolationTypeAtKey(kf, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
+				}
+				else
+				{
+					setBoundsRange(centerPoint, amp);
+
+					setMaskVertsAtTime(currentTime, i, boundsRange, masksGrp);
+					masksGrp.property(i).property("ADBE Mask Shape").setInterpolationTypeAtKey(kf, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
+				}
+
+				f += frameBias;
+				kf++;
+
 			}
-			else
-			{
-				setBoundsRange();
-
-				setMaskVertsAtTime(currentTime, i, boundsRange);
-				masksGrp.property(i).property("ADBE Mask Shape").setInterpolationTypeAtKey(kf, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
-			}
-
-			f += frameBias;
-			kf++;
-
 		}
 	}
 }
-	// 		currentTime = startTime;
 
-	// 		// for(var f = startTime; f <= endTime; f + frameBias)				// go through each frame in the range
-	// 		// {
-	// 		// 	currentTime = convertFPSToTime(f, 24);
-
-	// 		// 	for(var f = 1; f <= masksGrpLen; f++)
-	// 		// 	{
-	// 		// 		setMaskVertsAtTime(currentTime, f, randomVertsInRange());
-	// 		// 	}
-
-	// 		// 	i++;
-	// 		// }
-
-	// 		//alert(i);
-	// 	}
-
-	// 	// if (masksGrpLen > 0)
-	// 	// {
-	// 	// 	for(var f = 2; f <= masksGrpLen; f++)
-	// 	// 	{
-	// 	// 		currKey = 0;
-
-	// 	// 		for(var i = 0; i < 10; i++)
-	// 	// 		{
-	// 	// 		randVerts = randomVertsInRange();
-	// 	// 		randShape.vertices = randVerts;
-
-	// 	// 		currKey++;
-				
-	// 	// 		masksGrp.property(f).property("ADBE Mask Shape").setValueAtTime(i, randShape);
-	// 	// 		masksGrp.property(f).property("ADBE Mask Shape").setInterpolationTypeAtKey(currKey, KeyframeInterpolationType.HOLD, KeyframeInterpolationType.HOLD);
-
-	// 	// 		}
-	// 	// 	}
-	// 	// }
-
-
-function setBoundsRange()
+function setBoundsRange(_centerPoint, _amp)
 {
-	boundsRange[0][0] = centerPoint[0] + amp[1]; 																	// set bounds range for testing
-	boundsRange[0][1] = centerPoint[1] + amp[2];
+	boundsRange[0][0] = _centerPoint[0] + _amp[1]; 																	// set bounds range for testing
+	boundsRange[0][1] = _centerPoint[1] + _amp[2];
 
-	boundsRange[1][0] = centerPoint[0] + amp[0]; 
-	boundsRange[1][1] = centerPoint[1] + amp[2];
+	boundsRange[1][0] = _centerPoint[0] + _amp[0]; 
+	boundsRange[1][1] = _centerPoint[1] + _amp[2];
 
-	boundsRange[2][0] = centerPoint[0] + amp[0]; 
-	boundsRange[2][1] = centerPoint[1] + amp[3];
+	boundsRange[2][0] = _centerPoint[0] + _amp[0]; 
+	boundsRange[2][1] = _centerPoint[1] + _amp[3];
 
-	boundsRange[3][0] = centerPoint[0] + amp[1]; 
-	boundsRange[3][1] = centerPoint[1] + amp[3];
+	boundsRange[3][0] = _centerPoint[0] + _amp[1]; 
+	boundsRange[3][1] = _centerPoint[1] + _amp[3];
 
 	return boundsRange;
 }
@@ -171,18 +226,16 @@ function convertFPSToTime(frame, targetFPS)
 	return convertedFPS;
 }
 
-function setMaskVertsAtTime(time, maskIndex, keyVerts)
+function setMaskVertsAtTime(time, maskIndex, keyVerts, _masksGrp)
 {
 	var tempShape = new Shape();
 		
 		tempShape.vertices = keyVerts;	
 
-		masksGrp.property(maskIndex).property("ADBE Mask Shape").setValueAtTime(time, tempShape);
+		_masksGrp.property(maskIndex).property("ADBE Mask Shape").setValueAtTime(time, tempShape);
 }
 
-
-
-function randomVertsInRange() 
+function randomVertsInRange(_centerPoint, _amp) 
 {
 		var verts = [ [ 0, 0 ], [ 0, 0 ], [ 0, 0 ], [ 0, 0 ] ], 													// array of [ X+, X-, Y+, Y- ] vertices per newMasks
 		newVert,																								// newVert to be changed per loop	
@@ -190,11 +243,11 @@ function randomVertsInRange()
 		point1 = [ 0, 0 ]																						// random point1 within range of amp
 		;		
 
-		point0[0] = Math.random() * ((centerPoint[0] + amp[0]) - (centerPoint[0] + amp[1])) + (centerPoint[0] + amp[1]);
-		point0[1] = Math.random() * ((centerPoint[1] + amp[2]) - (centerPoint[1] + amp[3])) + (centerPoint[1] + amp[3]);
+		point0[0] = Math.random() * ((_centerPoint[0] + _amp[0]) - (_centerPoint[0] + _amp[1])) + (_centerPoint[0] + _amp[1]);
+		point0[1] = Math.random() * ((_centerPoint[1] + _amp[2]) - (_centerPoint[1] + _amp[3])) + (_centerPoint[1] + _amp[3]);
 
-		point1[0] = Math.random() * ((centerPoint[0] + amp[0]) - (centerPoint[0] + amp[1])) + (centerPoint[0] + amp[1]);
-		point1[1] = Math.random() * ((centerPoint[1] + amp[2]) - (centerPoint[1] + amp[3])) + (centerPoint[1] + amp[3]);
+		point1[0] = Math.random() * ((_centerPoint[0] + _amp[0]) - (_centerPoint[0] + _amp[1])) + (_centerPoint[0] + _amp[1]);
+		point1[1] = Math.random() * ((_centerPoint[1] + _amp[2]) - (_centerPoint[1] + _amp[3])) + (_centerPoint[1] + _amp[3]);
 
 		// vert 0
 		verts[0][0] = point0[0];	// per vert
@@ -214,108 +267,3 @@ function randomVertsInRange()
 
 		return verts;
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// in the for loop
-	// make new masks out of masksAmount, put in newMasks
-	
-	// for each in newMasks {																						// create the initial masks
-		// var tempVerts per mask
-		// verts.pop(tempVerts) add it to the array of vert arrays (newMask[0].vertices = verts[0])
-	
-	// 
-
-
-
-
-
-
-
-
-
-
-
-/*
-
-//////////////////////////////////////////////
-
-centerPoint[ X, Y ]							// center of glitch (assume nullPos is centerPoint, take incoming pos at time)
-amp[ X+, X-, Y+, Y- ]					    // amplitude in each direction XY
-frameBias									// which frames to move on
-freqRange[ min, max, bias ]					// range for glitch jitter with bias (set at beginning per mask, keep consistent throughout execution [stable masks stay, jittery move])
-
-
-*/
-
-
-
-
-
-
-
-
-// var glitchFreq = 0; 
-// var glitchAmp = 0;
-// var frameBias = 2;
-// var tempTime = 0;
-// var centerPoint,
-
-// // time fucker
-// for (var i = 0; i < numLayers; i++)
-// {
-
-// 	var currentLayer, 
-// 		verts, 
-// 		tempMask, 
-// 		newMask
-// 		;
-
-// 	verts = [[0,0],[0,100],[100,100],[100,0]];
-
-// 	currentLayer = selectedLayers[i];
-
-// 	newShape = new Shape();
-// 	newShape.vertices = verts;
-
-// 	newMask = currentLayer.property("ADBE Mask Parade").addProperty("Mask");
-// 	newMask.property("ADBE Mask Shape").setValue(newShape);
-// 	newMask.name = "newMask_001";
-
-// 	prop1.setValueAtTime(seconds, value);
-// 	// tempMask = currentLayer.property("ADBE Mask Parade").property(1);
-// 	// tempMask.property("ADBE Mask Shape").setValue(verts);
-
-// 	// get time length of each layer
-// 	// while tempTime < time length do this, else: tempTime = 0, 
-// 	// // tempTime += rand(frameBias, frameBias + rand(0, frameBias * (1 + amp)) % 2
-// 	// // place keyframe at tempTime
-
-// 	// repeat while loop for moving keyframes and converting some to holds
-// 	// convert to hold, then probability choose if moved (low probability for moving keys)
-
-// 	glitchAmp = i;
-// }
-
-// alert(selectedLayers);
-
